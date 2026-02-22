@@ -1,0 +1,9 @@
+numpy
+pandas
+scikit-learn
+tensorflow
+keras
+torch
+tf2onnx
+onnx
+esp-ppq
