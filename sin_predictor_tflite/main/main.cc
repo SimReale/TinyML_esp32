@@ -19,7 +19,7 @@ tflite::MicroInterpreter* interpreter = nullptr;
 TfLiteTensor* input = nullptr;
 TfLiteTensor* output = nullptr;
 
-constexpr int kWarmupRuns = 10;
+constexpr int kWarmupRuns = 100;
 constexpr int kBenchmarkRuns = 1000;
 constexpr float kSineRangeEnd = 2.0f * 3.14159265359f;
 constexpr size_t kTensorArenaSize = 16 * 1024;
@@ -92,26 +92,6 @@ bool FillInputTensor(float value)
 	}
 }
 
-// float ReadOutputTensor()
-// {
-// 	if (output == nullptr) {
-// 		return 0.0f;
-// 	}
-
-// 	switch (output->type) {
-// 	case kTfLiteFloat32:
-// 		return output->data.f[0];
-// 	case kTfLiteInt8:
-// 		return (static_cast<float>(output->data.int8[0]) - output->params.zero_point) * output->params.scale;
-// 	case kTfLiteUInt8:
-// 		return (static_cast<float>(output->data.uint8[0]) - output->params.zero_point) * output->params.scale;
-// 	case kTfLiteInt16:
-// 		return (static_cast<float>(output->data.i16[0]) - output->params.zero_point) * output->params.scale;
-// 	default:
-// 		return 0.0f;
-// 	}
-// }
-
 bool InitializeInterpreter()
 {
 	model = tflite::GetModel(sin_wave_model_tflite);
@@ -120,19 +100,12 @@ bool InitializeInterpreter()
 		return false;
 	}
 
-	static tflite::MicroMutableOpResolver<3> resolver;
+	static tflite::MicroMutableOpResolver<1> resolver;
 	if (resolver.AddFullyConnected() != kTfLiteOk) {
 		MicroPrintf("AddFullyConnected failed");
 		return false;
 	}
-	if (resolver.AddTanh() != kTfLiteOk) {
-		MicroPrintf("AddTanh failed");
-		return false;
-	}
-	if (resolver.AddReshape() != kTfLiteOk) {
-		MicroPrintf("AddReshape failed");
-		return false;
-	}
+	// ReLu operator is embedded in the FullyConnected one, so there is no need to add it separately.
 
 	static tflite::MicroInterpreter static_interpreter(
 		model, resolver, tensor_arena, kTensorArenaSize);
@@ -172,11 +145,12 @@ void MeasureInferenceLatency()
 		}
 	}
 
-	const int64_t start_us = esp_timer_get_time();
+	int64_t total_us = 0;
 	for (int i = 0; i < kBenchmarkRuns; ++i) {
 		const float position = static_cast<float>(kWarmupRuns + i) / static_cast<float>(run_count);
 		const float x = position * kSineRangeEnd;
 
+		const int64_t start_us = esp_timer_get_time();
 		if (!FillInputTensor(x)) {
 			return;
 		}
@@ -185,8 +159,8 @@ void MeasureInferenceLatency()
 			MicroPrintf("Benchmark invoke failed");
 			return;
 		}
+		total_us += esp_timer_get_time() - start_us;
 	}
-	const int64_t total_us = esp_timer_get_time() - start_us;
 	const float average_us = static_cast<float>(total_us) / static_cast<float>(kBenchmarkRuns);
 
 	std::printf("Sin model latency: total=%lld us, average=%.2f us over %d runs\n",
@@ -195,7 +169,7 @@ void MeasureInferenceLatency()
 				kBenchmarkRuns);
 }
 
-}  // namespace
+}
 
 extern "C" void app_main(void)
 {
