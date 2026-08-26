@@ -3,6 +3,8 @@ Train and Export Script for TinyML ESP32
 Implements sine wave approximation MLP and exports to TFLite and ESPDL formats
 """
 
+import argparse
+
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
@@ -190,7 +192,8 @@ def export_to_onnx(model, output_path=MODELS_DIR.joinpath('sin_wave_model.onnx')
     print("\n=== Exporting to ONNX format ===")
     
     # Create concrete function from model
-    input_spec = tf.TensorSpec(shape=(None, 1), dtype=tf.float32, name='input')
+    # ESP-DL deployment examples use a fixed batch size of 1.
+    input_spec = tf.TensorSpec(shape=(1, 1), dtype=tf.float32, name='input')
 
     @tf.function(input_signature=[input_spec])
     def model_func(x):
@@ -300,10 +303,13 @@ def evaluate_quantized_model(float_model, quant_ppq_graph, x_test, y_test, devic
         )
 
 
-def main():
+def main(target='esp32s3'):
     """
     Main execution flow for training and exporting the model.
     """
+    MODELS_TARGET_DIR = MODELS_DIR.joinpath(target)
+    MODELS_TARGET_DIR.mkdir(parents=True, exist_ok=True)
+
     print("=" * 60)
     print("TinyML ESP32 - Sin Wave Approximation MLP")
     print("=" * 60)
@@ -330,11 +336,11 @@ def main():
     
     # Step 5: Export to TFLite format (for esp-tflite-micro)
     print("\n[Step 4] Exporting to TFLite format...")
-    tflite_model = export_to_tflite(model, X, output_path=MODELS_DIR.joinpath('sin_wave_model.tflite'))
+    tflite_model = export_to_tflite(model, X, output_path=MODELS_TARGET_DIR.joinpath('sin_wave_model.tflite'))
 
     # Step 5: Export to ONNX format
     print("\n[Step 5] Exporting to ONNX format...")
-    ONNX_MODEL_PATH = MODELS_DIR.joinpath('sin_wave_model.onnx')
+    ONNX_MODEL_PATH = MODELS_TARGET_DIR.joinpath('sin_wave_model.onnx')
     onnx_model = export_to_onnx(model, output_path=ONNX_MODEL_PATH, opset=13)
     onnx_model = onnx.load_model(ONNX_MODEL_PATH)
     onnx.checker.check_model(onnx_model)
@@ -344,9 +350,8 @@ def main():
 
     # Step 6: Quantize ONNX model for ESPDL
     print("\n[Step 6] Quantizing ONNX model for ESPDL...")
-    ESPDL_MODEL_PATH = MODELS_DIR.joinpath('sin_wave_model.espdl')
+    ESPDL_MODEL_PATH = MODELS_TARGET_DIR.joinpath('sin_wave_model.espdl')
     INPUT_SHAPE = [1, 1]
-    TARGET = 'c'
     DEVICE = 'cpu'
 
     X_torch, _ = generate_sin_wave_data(num_samples=2000, output_type='torch')
@@ -359,7 +364,7 @@ def main():
         calib_dataloader=dataloader,
         calib_steps=256,
         num_of_bits=8,
-        target=TARGET,
+        target=target,
         device=DEVICE,
         error_report=True,
         skip_export=False,
@@ -386,4 +391,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+
+    parser = argparse.ArgumentParser(description="Train and export MLP for sine wave approximation")
+    parser.add_argument('--target',
+                        type=str,
+                        default='esp32s3',
+                        choices=['c', 'esp32s3', 'esp32p4'],
+                        help='Target ESP32 variant for ESPDL export')
+    args = parser.parse_args()
+    main(target=args.target)
