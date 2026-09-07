@@ -2,7 +2,7 @@
 
 This repository accompanies a comparative study of two neural network inference frameworks for Espressif microcontrollers: **ESP-DL** and **ESP-TFLite-Micro**. Both approaches are applied to the same regression task—approximating the sine function $f(x) = \sin(x)$ over the domain $x \in [0, 2\pi]$—using an identical Multi-Layer Perceptron (MLP) with topology **input → 32 → 64 → 128 → output**.
 
-<div style="text-align: center;">
+<div align="center">
     <img src="media/sin_wave_quantized_comparison.png" alt="Sin wave comparison" width="500">
 </div>
 
@@ -28,7 +28,7 @@ The `--target` flag selects the ESP32 variant for ESP-DL export (`c`, `esp32s3`,
 
 ## ESP-TFLite-Micro
 
-<div style="text-align: center;">
+<div align="center">
     <img src="media/tf_lite_micro.png" alt="TFLite Micro logo" height="120">
 </div>
 
@@ -63,7 +63,7 @@ After running the command, you will find a new file named `model_data.cc` in the
 
 ## ESP-DL
 
-<div style="text-align: center;">
+<div align="center">
     <img src="media/espressif.png" alt="ESP-DL logo" height="100">
 </div>
 
